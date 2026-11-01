@@ -3,7 +3,7 @@
 - Consultant: Dr. Tibor Gregorics
 - Title: Interactive application of search algorithms and representation of state graphs
 - Date of submission: 30. 04. 2026.
-- [Thesis paper (Hungarian)](Docs/szakdolgozat.pdf)
+- [Thesis paper (Translated to English)](Docs/bsc_paper.pdf)
 - [Windows executable files](https://github.com/SzecsiSzabi/rushhour/releases/download/v1.0/windows_build.zip)
 - [Linux executable files](https://github.com/SzecsiSzabi/rushhour/releases/download/v1.0/linux_build.zip)
 - [Download source](https://github.com/SzecsiSzabi/rushhour/archive/refs/tags/v1.0.zip)

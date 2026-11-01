@@ -1,0 +1,16 @@
+\chapter{Conclusion}
+\label{ch:sum}
+
+This thesis implemented search algorithms, heuristics, visualization, and interaction within the framework of the Rush Hour logic puzzle. Similar analyses could also be useful for many other problems and games.
+Three fundamental algorithms were implemented for state-space search, providing a clear illustration of different approaches to a problem. The system can also be used to run a custom algorithm visually, analyze its behavior, and check whether it behaves correctly as expected.
+
+\paragraph{Possible extensions.} The application could be developed further in several areas:
+\begin{compactitem}
+\item Support for additional puzzle types beyond Rush Hour to generalize the framework.
+\item Implementation of A$^*$ search, with reopening of closed states, for comparison with the A$^C$ algorithm.
+\item Parallel execution of algorithms to compare different configurations side by side.
+\item GPU-accelerated force computation to handle graphs containing thousands of vertices.
+\item Playback of an algorithm's solution on the game board.
+\item Implementation of a depth limit for backtracking search.
+\item Restructuring the application according to the MVVM (Model--View--ViewModel) architecture.
+\end{compactitem}

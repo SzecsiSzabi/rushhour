@@ -1,0 +1,39 @@
+% Keep the original cover's hierarchy, with flexible columns for English text.
+\renewcommand{\maketitle}{%
+  \begin{titlepage}
+    \begin{center}
+      \begin{minipage}[c]{0.25\textwidth}
+        \centering
+        \includegraphics[width=0.95\linewidth]{\logofilename}
+      \end{minipage}\hfill
+      \begin{minipage}[c]{0.72\textwidth}
+        \centering
+        {\scshape\Large \univname\par}
+        \vspace{0.4cm}
+        {\scshape\Large \facname\par}
+        \vspace{0.5cm}
+        {\scshape\large \deptname\par}
+      \end{minipage}
+
+      \vspace{4.5cm}
+      {\bfseries\LARGE \thesistitle\par}
+      \vspace{4cm}
+
+      \begin{minipage}[t]{0.54\textwidth}
+        \raggedright
+        {\itshape\large \suplabel:\par}
+        {\large \supname\par}
+        \supaff\par
+      \end{minipage}\hfill
+      \begin{minipage}[t]{0.40\textwidth}
+        \raggedright
+        {\itshape\large \authorlabel:\par}
+        {\large \authorname\par}
+        \degreename\par
+      \end{minipage}
+
+      \vfill
+      {\itshape \cityname, \thesisyear\par}
+    \end{center}
+  \end{titlepage}
+}

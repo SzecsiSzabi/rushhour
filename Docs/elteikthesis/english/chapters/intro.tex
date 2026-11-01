@@ -1,0 +1,17 @@
+\chapter{Introduction}
+\label{ch:intro}
+
+Search algorithms play a central role in computer science, particularly in artificial intelligence~\cite{russellnorvig2020}. These algorithms are essential for pathfinding, game analysis, and automated reasoning. Although their theoretical properties---such as completeness, optimality, and computational complexity---are well understood, few interactive tools are available to help learners understand how they work.
+
+Visualizing the explored state space can make the rules governing a search algorithm's decisions much clearer. A visualization of its global working memory reveals the knowledge the algorithm has acquired, allows the role of heuristic functions to be analyzed, and makes it possible to compare the results produced by different configurations.
+
+This thesis presents an interactive application that applies search algorithms to the Rush Hour logic puzzle~\cite{rushhour_puzzle} and visualizes the explored state graph in three-dimensional space. Rush Hour is a sliding-block puzzle in which the player moves vehicles on a $6 \times 6$ board to clear a path to the exit for the main (red) car. Although the rules are simple, the puzzles range from easy to surprisingly complex---the generalized version has been shown to be PSPACE-complete~\cite{flake2002rush}---making it an ideal problem for this analysis.
+
+The project approaches the problem from two directions:
+
+\begin{enumerate}
+    \item \textbf{Implementation and control of search algorithms.} Three search algorithms have been implemented---tabu search, backtracking search, and A$^C$ graph search. Each can be configured with one of four heuristic functions and an optional randomization setting. Users can also play the puzzle manually, and every discovered state appears in the state graph.
+    \item \textbf{Three-dimensional state graph visualization.} Discovered states appear as circular vertices in three-dimensional space, connected by edges representing valid moves. A force-directed layout~\cite{fruchterman1991graph} uses a physical simulation to move the vertices so that neighboring states remain close together while non-neighboring states move apart. To address the $O(V^2)$ cost of computing repulsive forces, the Barnes--Hut algorithm~\cite{barneshut1986} and an octree spatial data structure are used, reducing the complexity to $O(V \log V)$ per frame, where $V$ is the number of discovered vertices.
+\end{enumerate}
+
+The application was developed using Godot Engine 4.6~\cite{godot_engine}, C\#, and .NET 9.0~\cite{dotnet9}, and follows the Model--View architecture~\cite{krasner1988mvc}. The model layer encapsulates the puzzle logic, search algorithms, and heuristic functions in plain C\# constructs. The view layer implements the physical simulation, rendering, and user interaction using Godot's scene system.

@@ -1,0 +1,630 @@
+\chapter{Developer Documentation}
+\label{ch:impl}
+
+This chapter presents the analysis, design, implementation, and testing of the application.
+
+\section{Analysis}
+
+\subsection{Task Description}
+
+The task is to develop an interactive application that:
+\begin{compactenum}
+\item Models the Rush Hour sliding-block puzzle~\cite{rushhour_puzzle} as an immutable state-transition system on a $6\times6$ board with $1\times2$ cars and $1\times3$ buses.
+\item Implements three configurable search algorithms (tabu search, backtracking search, and A$^C$ graph search) with four heuristic functions.
+\item Visualizes the explored state graph in 3D using a force-directed layout and Barnes--Hut optimization~\cite{barneshut1986}.
+\item Supports manual play and interactive inspection of states by clicking graph vertices.
+\end{compactenum}
+
+The generalized Rush Hour puzzle, played on an arbitrary $n \times n$ board, has been shown to be PSPACE-complete~\cite{flake2002rush}. Hearn and Demaine~\cite{hearn2005pspace} later introduced a more general framework establishing the same result for a broad class of sliding-block puzzles. Although the standard $6 \times 6$ board is finite and manageable in size, the state space can grow exponentially with the number of vehicles, justifying the use of efficient heuristics and search algorithms.
+
+\subsection{Functional Description}
+
+The functional requirements are summarized by the user stories in Table~\ref{tab:userstory}.
+
+\begin{center}
+\begin{longtable}{ | P{0.22\storywidth} | P{0.22\storywidth} | P{0.22\storywidth} | P{0.34\storywidth} | }
+\hline
+\multicolumn{4}{|c|}{\textbf{User Stories}}
+\\ \hline
+\textbf{Goal} & \textbf{Precondition} & \textbf{Event} & \textbf{Result}
+\\ \hline \hline
+\endfirsthead
+\hline
+\textbf{Goal} & \textbf{Precondition} & \textbf{Event} & \textbf{Result}
+\\ \hline \hline
+\endhead
+\hline
+\endfoot
+\endlastfoot
+Select a level & The level selection tab is open & I click the desired level's preview & The initial state is loaded; only the initial state appears in the graph; the right panel switches to the Solver settings tab \\ \hline
+Discover state graph vertices & The Solver settings tab is open & I click the state discovery button & Discovered vertices are added to the state graph, with goal vertices highlighted \\ \hline
+Pause state discovery & State discovery is running & I click the button to pause state discovery & State discovery pauses \\ \hline
+Select a search algorithm & The Solver settings tab is open & I select the desired search algorithm from the options & The search algorithm is selected \\ \hline
+Select a heuristic function & The Solver settings tab is open & I select the desired heuristic function from the options & The heuristic is selected \\ \hline
+Apply the configured search algorithm & The Solver settings tab is open & I click the button to apply the search algorithm & The search algorithm is applied to the loaded puzzle with the selected settings \\ \hline
+Start or resume the search algorithm & The Game board tab is open & I click the button to start or resume the search algorithm & The algorithm starts; vertices and edges in its global working memory are highlighted; it stops if it finds a goal state \\ \hline
+Pause the search algorithm & The Game board tab is open and a search algorithm is running & I click the button to pause the search algorithm & The algorithm pauses; vertices and edges in its global working memory remain highlighted \\ \hline
+Run the search algorithm step by step & The Game board tab is open & I click the button to execute a single algorithm step & The algorithm executes one step; vertices and edges in its global working memory are highlighted \\ \hline
+Set the search algorithm's speed & The Game board tab is open & I move the speed slider to the desired position & Each algorithm step is performed at the selected speed \\ \hline
+Make a manual move on the board & The Game board tab is open & I click the red arrow corresponding to the desired move & The car moves on the board; the new state's vertex is discovered and highlighted in the graph \\ \hline
+Switch the game board to manual mode & The Game board tab is open & I click the Manual button above the board & The board switches to manual mode; the displayed state is highlighted in the graph; any running algorithm continues in the background \\ \hline
+Display the algorithm's steps on the board & The Game board tab is open & I click the Algorithm button above the board & The board switches to Algorithm mode and displays the algorithm's most recently expanded state, then follows subsequent expansions \\ \hline
+Jump to a discovered state & A puzzle is loaded & I left-click (M1) a discovered state's vertex & The board displays the selected state, and its vertex is highlighted in the graph \\ \hline
+Rotate the state graph & A puzzle is loaded & I right-click (M2) the graph and drag the mouse & The graph rotates around the active vertex according to the mouse movement \\ \hline
+Move the state graph & A puzzle is loaded & I press one of the WASD keys & The graph moves on the canvas according to the key pressed \\ \hline
+Hide or show irrelevant edges and vertices & The Game board tab is open & I click the toggle for hiding irrelevant edges and vertices & Irrelevant edges and vertices are hidden or shown in the state graph \\ \hline
+Follow vertices expanded by the algorithm & The Game board tab is open & I click the toggle for following the algorithm's vertices & The state graph camera follows the vertices expanded by the algorithm \\ \hline
+Zoom in or out on the state graph & A puzzle is loaded & I use the mouse wheel over the state graph & The graph is zoomed in or out according to the wheel movement \\ \hline
+Exit the program & The program is running & I close the program window & The program closes \\ \hline
+\caption{User stories}
+\label{tab:userstory}
+\end{longtable}
+\end{center}
+
+\subsection{Nonfunctional Requirements}
+
+\begin{compactitem}
+\item \textbf{Performance}: the 3D graph must remain interactive even with thousands of vertices. Barnes--Hut optimization must keep the computational cost per frame manageable.
+\item \textbf{Portability}: standalone executables for Windows and Linux, with support for building for other platforms through the Godot editor.
+\item \textbf{Usability}: an intuitive user interface with color-coded graph elements and responsive controls.
+\item \textbf{Correctness}: the search algorithms must exhibit their expected properties; for example, A$^C$ graph search must find an optimal solution when using a monotone heuristic.
+\end{compactitem}
+
+\subsection{Related Work}
+
+Visualizing state-space search is not a new idea in the context of sliding-block puzzles. The 2swap YouTube channel~\cite{2swap_klotski} presents the Japanese Klotski puzzle, which is similar to Rush Hour. The graph structure shown there clearly demonstrates how visual tools can reveal the combinatorial structure of puzzles.
+
+The present application additionally allows different search algorithms to be run on the puzzles, enabling real-time comparisons of heuristics and algorithms.
+
+\section{Design}
+
+\subsection{Software Architecture}
+
+The application follows the \textbf{Model--View} architecture~\cite{krasner1988mvc}:
+
+\begin{description}
+\item[Model layer] (\texttt{src/Model/}) Contains plain C\# classes for representing game states, generating moves, evaluating heuristics, and implementing search algorithms. The model is independent of the Godot engine except for its use of Godot's \texttt{Vector2I} structure, which avoids subsequent conversions.
+\item[View layer] (\texttt{src/Nodes/}) Contains Godot node scripts derived from the engine's base classes, such as \texttt{Control}, \texttt{RigidBody3D}, and \texttt{MeshInstance3D}. These classes handle rendering, the physical simulation, the user interface, and input. They subscribe to model events (\texttt{NewEdge}, \texttt{PathChange}, \texttt{NewCurrent}, and \texttt{Terminated}) to respond to the algorithm's progress.
+\end{description}
+
+Communication between the model and the view is implemented through C\# events defined on the abstract \texttt{RHSolver} base class. The view subscribes to these events and creates or updates the corresponding visual elements: vertices, edges, and highlights.
+
+\subsection{Model}
+\label{sec:model}
+
+Class diagrams of the main parts of the model are shown in Figures~\ref{fig:model-state-class} and~\ref{fig:model-solvers-class}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.0\textwidth]{model_state}
+\caption{Class diagram of the state representation}
+\label{fig:model-state-class}
+\end{figure}
+
+States and pieces are all represented by immutable classes.
+
+\begin{description}
+\item[\texttt{RHGameState}] An immutable representation of a board configuration. Immutability is ensured by the \texttt{init;} keyword and \textit{readonly} data structures. It stores placed vehicles as an array of \texttt{PlacedRHPiece} objects and generates a $6\times6$ integer matrix from them for fast cell access. It provides the methods \texttt{GetPossibleMoves()}, \texttt{WithMove()}, and \texttt{IsSolved()}, as well as value-based equality checks accelerated by hash codes. Since the data structure is immutable, the hash code only needs to be calculated once during initialization and can then be returned on every subsequent request.
+
+\item[\texttt{PlacedRHPiece}] Associates a \texttt{RushHourPiece} (Car, MainCar, or Bus) with a position and orientation on the board. Its \texttt{WithMove()} method returns a new instance with an updated position.
+
+\item[\texttt{Move} / \texttt{StateMove}] A \texttt{Move} is a structure carrying little information on its own: a vehicle index and a direction. A \texttt{StateMove} records a complete transition: the source state, the target state, and the move itself. Since every move in the model can be reversed, equality checks do not distinguish a move from its reverse: $(A \to B) = (B \to A)$. The model therefore forms an undirected graph.
+\end{description}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{model_solvers}
+\caption{Class diagram of the search algorithms}
+\label{fig:model-solvers-class}
+\end{figure}
+
+\begin{description}
+    \item[\texttt{RHSolver} hierarchy] The abstract \texttt{RHSolver} base class defines the event-driven interface and shared logic. Its concrete subclasses are:
+    \begin{compactitem}
+        \item \texttt{TabuSolver}: maintains a list of recent states and selects the best non-tabu neighbor.
+        \item \texttt{BacktrackingSolver}: maintains a stack of ordered option lists and backtracks at dead ends.
+        \item \texttt{AcGraphSolver}: uses a \texttt{PriorityQueue} ordered by $f = g + h$ and tracks discovered states in a dictionary.
+        \item \texttt{BFSDiscoverer} / \texttt{DFSDiscoverer}: the \texttt{Discoverer} class is based on graph search and therefore inherits from \texttt{AcGraphSolver}. It does not check for a solution and does not terminate when a solved state is expanded. Its breadth-first and depth-first subclasses override the evaluation function.
+    \end{compactitem}
+    \item[\texttt{Heuristic} hierarchy] An abstract class hierarchy that enforces heuristic properties through the type system: \texttt{Heuristic} $\supset$ \texttt{NonNegativeHeuristic} $\supset$ \texttt{AdmissibleHeuristic} $\supset$ \texttt{MonotoneHeuristic}. The A$^C$ graph search implementation requires a \texttt{MonotoneHeuristic} at compile time.
+\end{description}
+
+The model also includes the static \texttt{Levels} class, which contains strings describing the levels and a parser that converts them into \texttt{RHGameState} instances. This makes it easy to describe a level without specifying the objects' position structures directly. The levels were selected from puzzles in the official video game.~\cite{rushhour_video_game}
+
+\subsection{View}
+\label{sec:view}
+
+Class diagrams of the main parts of the view are shown in Figures~\ref{fig:view-gameboard-class} and~\ref{fig:view-stategraph-class}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1.0\textwidth]{view_gameboard}
+\caption{Class diagram of the classes used to display the game board}
+\label{fig:view-gameboard-class}
+\end{figure}
+
+\begin{description}
+    \item[\texttt{GameBoard}] An object responsible for displaying an \texttt{RHGameState}; puzzle previews on the level selection tab use this class. The Game board tab contains an instance of the \texttt{MainGameBoard} subclass, which handles switching between Manual and Algorithm modes, displaying the board state, and managing the vehicles' arrows. It subscribes to vertex-click events for manual navigation.
+    \item[\texttt{VehicleNode} / \texttt{CarNode} / \texttt{BusNode}] \texttt{Sprite2D} objects representing vehicles. They belong to a \texttt{GameBoard} object; the members of this composition can be accessed through Godot's scene-tree parent/child methods. Vehicles belonging to the \texttt{MainGameBoard} have \texttt{Arrow} objects for manual movement. The arrows are instantiated only once. If a move into the cell indicated by an arrow is not possible, its visibility and interaction are disabled using its \texttt{IsActive} field.
+\end{description}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\textwidth]{view_stategraph}
+\caption{Class diagram of the state graph visualization, including the octree implementation adapted to the project}
+\label{fig:view-stategraph-class}
+\end{figure}
+
+\begin{description}
+    \item[\texttt{GraphScene}] The 3D root node, which runs the simulation, invokes rendering, and handles slowdowns caused by intensive computation. In each physics frame, it rebuilds the Barnes--Hut octree using the vertices' current positions. It computes the forces for all edges and vertices in parallel, then also computes vertex movement in parallel. To detect vertex clicks, it performs a ray cast based on the camera's current position and orientation.
+    \item[\texttt{Vertex}] Represents a state, displayed as a circle in the state graph. It provides a thread-safe data structure for accumulating forces and maintains a priority-based effect system for color and size. It approximates the force acting on it by traversing the constructed octree.
+    \item[\texttt{Edge}] Represents a move, displayed as a line in the state graph. The \texttt{ApplySpringForce} method adds spring forces to its endpoint vertices. Its color can be queried based on its assigned effect.
+    \item[\texttt{VertexDrawer, EdgeDrawer}] Classes responsible for rendering. Instead of giving each vertex and edge its own \texttt{Sprite3D} or \texttt{ImmediateMesh} object, the components are collected into arrays and used to draw all vertices and edges in batches, significantly speeding up rendering.
+    \item[\texttt{OctTreeNode}] Implemented based on the \textit{NetOctree} repository~\cite{octree_mcserep}, retaining only the methods needed by this project and adding force approximation. It implements the Barnes--Hut algorithm in three-dimensional space.
+\end{description}
+
+Other notable classes in the view layer are:
+\begin{description}
+\item[\texttt{Camera3d}] An orthographic 3D camera belonging to \texttt{GraphScene}, with movement, rotation, and zoom controls for inspecting the state graph in detail. It is based on the \textit{3D-RTS-Camera} repository.~\cite{3d_rts_camera}
+\item[\texttt{AlgoPlayer}] Controls the timing of algorithm execution, subscribes to and unsubscribes from solver events, and handles play, pause, step, and restart operations.
+\item[\texttt{SolverSettingsTab}] Provides the user interface for selecting algorithms and heuristics, setting the tabu size and randomization, and configuring BFS/DFS discovery.
+\end{description}
+
+\subsection{Data Storage}
+
+The application does not use a database. Puzzle levels are stored as hard-coded string literals in the \texttt{Levels} class. Each level is a seven-line string: the first line contains the level title, and the remaining six lines represent the $6\times6$ grid. This representation is compact, human-readable, and easy to interpret.
+
+\subsection{Search Algorithms and Heuristics}
+\label{sec:algorithms}
+
+This section describes the three search algorithms and the heuristic functions used to guide them.
+
+\subsubsection{Heuristic Functions}
+
+All four heuristics satisfy three fundamental properties:
+\begin{compactitem}
+\item \textbf{Nonnegativity}: $h(s) \geq 0$ for every state $s$.
+\item \textbf{Admissibility}: $h(s) \leq h^*(s)$, where $h^*(s)$ is the minimum number of moves needed to reach a solution from $s$.
+\item \textbf{Monotonicity} (consistency): for any state $s$ and any successor $s'$ reachable in a single move, $| h(s) - h(s') | \leq 1$.
+\end{compactitem}
+
+These properties are required for the graph search to be A$^C$ graph search: when a state is first expanded, the shortest path to it has already been found, so that state never needs to be expanded again.~\cite[p.~69, Theorem~4.3]{gregorics_2006_bevezetes} \cite[p.~16]{gregorics_grafker}
+
+\paragraph{Null heuristic.} $h(s) = 0$ for every state. This provides no information about the state, turning the search into uninformed brute-force exploration. It is useful for observing the underlying algorithm's behavior.
+
+The following heuristics were implemented specifically for the $6 \times 6$ Rush Hour board, with its exit at the right end of the third row.
+
+\paragraph{Distance heuristic.} $h(s) = w_{\text{board}} - 1 - x_{\text{main}}$, where $w_{\text{board}}$ is the board width and $x_{\text{main}}$ is the column containing the front of the main car, indexed from 0. On a board six cells wide, this value ranges from 0 (solved) to 4. It is admissible because the main car must move at least this many cells to reach the exit. It is monotone because a single move changes the main car's distance by at most 1.
+
+\paragraph{Distance + blocking heuristic.} Adds a cost of one to the distance heuristic for each cell occupied by a vehicle between the main car and the exit in the exit row. It is admissible because removing each blocking element requires at least one additional move. It is monotone because a single move changes either the distance or the number of blocking cells by at most 1.
+
+\paragraph{Least-moves heuristic.} Extends the distance heuristic with a lower bound on the cost of moving blocking vehicles out of the way. For every vehicle blocking the main car's path, it calculates the minimum number of moves required to clear it, taking into account (a) the direction in which it must move---buses must always move downward into rows 4--6 because the exit is in row 3---and (b) other vehicles obstructing that movement. To preserve monotonicity, this analysis cannot be extended in the same way to the number of moves needed to shift the vehicles that block the cars blocking the main car. Using the same estimation method at that level would make the heuristic nonmonotone: removing such a blocker could decrease the heuristic value by 2.
+
+\subsubsection{Tabu Search}
+\label{sec:tabu}
+
+Tabu search~\cite{glover1989tabu} is a local search metaheuristic. At each step, it discovers all neighboring states, filters out those on the tabu list, evaluates the heuristic for the remaining candidates, and moves to the best remaining neighbor according to that heuristic.
+
+The tabu list stores the last $t$ visited states and requires $O(t)$ memory. The main configurations are:
+\begin{compactitem}
+\item $t = 0$: greedy search without memory, always moving to the best neighbor according to the heuristic.
+\item $t = 1$: a hill-climbing algorithm that only avoids returning to the immediately preceding state.
+\item $t > 1$: avoids the last $t$ states. It stops without a solution if every neighbor is on the tabu list.
+\end{compactitem}
+
+Tabu search does \emph{not} guarantee that a solution will be found or that it will be optimal. It is a fast local method that can become trapped in regions of the state space with favorable heuristic scores but no solution.
+
+\subsubsection{Backtracking Search}
+\label{sec:backtracking}
+
+For each state, backtracking search maintains a sequence of neighboring states that have not yet been visited on the current path, ordered by the heuristic. Its memory requirement is $O(V)$. At each step, it examines the best untried option of the last state on the current path. If no new option remains, it removes that state from the end of the path: the algorithm backtracks.
+
+\textbf{Termination guarantee}: backtracking is guaranteed to terminate on a finite state graph.~\cite[p.~46, paragraph~3]{gregorics_2006_bevezetes} \cite[p.~19]{gregorics_backtrack} Since the state graph is finite, the search can be regarded as having a depth limit of $V$. If it terminates without a solution, no solution is reachable from the initial state. However, it avoids only states on the current path, rather than all previously visited states. It may therefore explore large groups of states repeatedly, resulting in substantial redundant work.
+
+\textbf{Time complexity}: in the worst case, the algorithm may explore every simple path from the initial state. For Rush Hour, there is a natural branching bound $b$ such that no state has more than $b$ neighbors. In a space with branching factor $b$ and $V$ states, the algorithm examines $O(b^V)$ paths in the worst case, and the number of steps is also $O(b^V)$.~\cite[Section~3.4]{russellnorvig2020} Under the rules of Rush Hour, the branching factor of any puzzle is at most $2 N_{\text{vehicles}}$, where $N_{\text{vehicles}}$ is the total number of cars and buses. With a suitable heuristic, the algorithm usually finds a solution much faster, provided one is reachable.
+
+\subsubsection{A\textsuperscript{C} Graph Search}
+\label{sec:graphsearch}
+
+A$^C$ graph search, also called the consistent algorithm~\cite[Chapter~4.4]{gregorics_2006_bevezetes}, is an informed search algorithm using the evaluation function $f(n) = g(n) + h(n)$~\cite[p.~16]{gregorics_grafker}, where $g(n)$ is the depth and $h(n)$ is the heuristic score. The name A$^C$ follows the notation in Tibor Gregorics's artificial intelligence notes: the \enquote{C} refers to the \emph{closed list}, meaning that states that have already been expanded are not expanded again. It is a special variant of the A$^*$ algorithm~\cite{hart1968astar} which, with a monotone heuristic, guarantees that the shortest path to a state has already been found when that state is first expanded.
+
+Since all applicable heuristics are nonnegative, admissible, and monotone, the following property holds: when a state is removed from the priority queue for expansion, the path by which it was reached is a shortest path to that state. Each state therefore needs to be expanded at most once.~\cite[p.~16]{gregorics_grafker}
+
+This eliminates the cycle-traversal and rediscovery problems of backtracking. However, the algorithm may still explore many states that are unnecessary for the solution, because it examines every state whose $f$-value is lower than the cost of the optimal solution.
+
+\textbf{Time complexity}: A$^C$ graph search expands each state at most once, giving at most $O(V)$ expansions. Each expansion generates at most $O(b)$ successors, where $b$ is the branching factor, at most $2 \times N_{\text{vehicles}}$, and each insertion into the priority queue costs $O(\log V)$. The memory requirement is $O(V)$ because of the dictionary of open and expanded states.
+
+\subsubsection{The Barnes--Hut Algorithm and the Octree}
+\label{sec:barneshut}
+
+Force-directed graph layout~\cite{fruchterman1991graph} requires repulsive forces to be calculated between every pair of vertices, costing $O(V^2)$ per frame. With thousands of vertices, this becomes a performance bottleneck.
+
+The Barnes--Hut algorithm~\cite{barneshut1986,barneshut_princeton} reduces this to $O(V \log V)$ using a hierarchical spatial data structure: an \textbf{octree} in three dimensions. The algorithm proceeds as follows:
+
+\begin{enumerate}
+\item \textbf{Build the octree}: calculate an axis-aligned cube containing all vertices and use it as the root region, inserting the vertices one by one. Each internal node stores the number of vertices in its subtree and their center of mass. Each leaf contains a single vertex. Building the tree for $V$ vertices takes $O(V \log V)$ time.~\cite{barneshut1986}
+\item \textbf{Compute the forces}: for each vertex $v$, invoke the force calculation at the root of the tree. At each node $o$:
+    \begin{compactitem}
+        \item If $s / d < \theta$, where $s$ is the side length of the cube represented by $o$ and $d$ is the distance from $v$ to the center of mass of $o$, treat the entire cell as a single body with a mass equal to the number of vertices it contains. This is the \emph{Barnes--Hut criterion}.
+        \item Otherwise, recursively traverse the children of $o$, calculating or approximating each child's contribution to the force on $v$ and applying it to $v$.
+    \end{compactitem}
+    The procedure takes $O(\log V)$ time per vertex on average.~\cite{barneshut1986} The total force computation for all vertices therefore also takes $O(V \log V)$ time.
+\item The parameter $\theta$, typically set within the range $0.5$--$1.5$, controls the tradeoff between accuracy and speed.~\cite{barneshut1986} The application uses $\theta = 1.0$.
+\end{enumerate}
+
+The repulsive force between two points follows an inverse-square law: $\vec{F} = -k \cdot m / d^2 \cdot \hat{r}$.
+
+The octree is rebuilt from scratch at every physics update because vertex positions change continuously. Tree construction takes $O(V \log V)$ time, and force calculation takes $O(\log V)$ per vertex, giving a total time complexity of $O(V \log V)$ per update.
+
+\section{Implementation}
+
+\subsection{Technologies Used}
+
+\begin{compactitem}
+\item \textbf{Godot Engine 4.6} (Mono/.NET variant)~\cite{godot_engine}: an open-source game engine providing 2D/3D rendering, physics, and user interface facilities.
+\item \textbf{C\# and .NET SDK 9.0}~\cite{dotnet9}: all application logic was written in C\#. It is one of the languages supported by Godot and is well suited to object-oriented logic.
+\end{compactitem}
+
+Godot features used:
+\begin{compactitem}
+\item \texttt{MultiMeshInstance3D} for batched rendering of vertices and edges.
+\item \texttt{Container} objects for constructing the user interface, together with built-in click events for buttons and \texttt{CollisionShape2D} objects.
+\item Execution of the \texttt{\_PhysicsProcess} method on a background thread to avoid blocking interaction.
+\end{compactitem}
+
+\subsection{Deviations from the Original Design}
+
+\paragraph{Force evaluation and sleeping optimization.}
+Initially, each vertex and edge was implemented as a Godot object with its own rendering.
+Rendering thousands of edges and vertices through separate calls in every frame proved extremely expensive. The following approach was implemented first to address this:
+
+\begin{compactenum}
+\item Instead of applying forces directly through Godot's physics API, accumulate them in a field on each vertex (\texttt{Vector3 \_pendingForces}).
+\item At the end of each physics update, a \texttt{Processor} node iterates over the vertices and calls their evaluation functions.
+\item A dynamic threshold determines whether a pending force is significant enough to apply. This threshold scales with the vertex's \enquote{age} (\texttt{\_timeAwake}) and the total number of vertices. Small residual forces in large, stabilized graphs are ignored, while significant forces are applied through Godot's functions.
+\item If the forces remain below the threshold, velocity damping eventually brings the vertices to rest. The engine then puts the \texttt{RigidBody3D} into \enquote{sleep} mode, stopping its movement and calls to \texttt{\_PhysicsProcess}. A vertex can wake again if an edge's spring force exceeds the threshold and is applied to it.
+\item Edges whose endpoints are both asleep skip their line-mesh updates, substantially reducing the rendering load.
+\end{compactenum}
+
+This staged optimization (force threshold $\to$ physics sleep $\to$ skipped rendering) significantly improved performance once the state graph had settled. However, most graphs containing thousands of vertices took too long to settle for this optimization to become useful. The approach therefore had to be redesigned completely: vertices and edges were converted into classes that do not derive from Godot classes, and their rendering was delegated to separate classes. This optimization also made rendering much faster while the graph was actively moving. In addition, when there are thousands of vertices, the physics update rate is reduced from $60/s$ to $10/s$. The application no longer has to wait for one physics update before every UI update; several UI frames can run between physics updates, keeping the interface responsive.
+
+\section{Testing}
+
+\subsection{Unit Tests}
+
+The following unit tests check the correctness of the model layer:
+
+\begin{center}
+\begin{longtable}{ | P{0.05\textwidth} | P{0.30\textwidth} | P{0.55\textwidth} | }
+\hline
+\multicolumn{3}{|c|}{\textbf{Model Unit Tests}}
+\\ \hline
+\textbf{\#} & \textbf{Test case} & \textbf{Verification}
+\\ \hline \hline
+\endfirsthead
+\hline
+\textbf{\#} & \textbf{Test case} & \textbf{Verification}
+\\ \hline \hline
+\endhead
+\hline
+\endfoot
+\endlastfoot
+
+U1
+& Level parsing
+& When a known level string is loaded, the level title and the vehicles' count, types (MainCar, Bus, Car), positions, and orientations exactly match the values encoded in the string.
+\\ \hline
+
+U2
+& Board grid consistency
+& After loading, every cell in the internal $6\times6$ integer matrix of \texttt{RHGameState} contains either the appropriate vehicle index or $-1$; no cell remains uninitialized.
+\\ \hline
+
+U3
+& Loading all built-in levels
+& \texttt{Levels.LoadLevels()} successfully loads every built-in level. For each level, verify that its title is nonempty, its first vehicle is a MainCar, its initial state is not solved, and at least one legal move exists.
+\\ \hline
+
+U4
+& Move generation
+& \texttt{GetPossibleMoves()} and \texttt{GetPossibleStateMoves()} consistently return the same number of moves. For every returned move, verify that the affected vehicle remains within the board boundaries in the resulting state and that \texttt{StateMove.To} equals the result calculated separately using \texttt{WithMove()}.
+\\ \hline
+
+U5
+& State immutability
+& After calling \texttt{WithMove()}, the affected vehicle's position in the original state is unchanged; the \texttt{==} and \texttt{!=} operators identify the new state as different from the original.
+\\ \hline
+
+U6
+& State equality
+& Two states loaded from the same configuration compare equal, with consistent results from \texttt{Equals}, \texttt{==}, and \texttt{!=}. After a move, the states differ. Applying the same move to two separate instances makes them equal again. They also match a state loaded from a separate string describing the modified positions.
+\\ \hline
+
+U7
+& Hash consistency
+& \texttt{GetHashCode()} returns the same value for equal states. A different state produced by a move almost certainly has a different value, enabling fast hash-map-based lookup.
+\\ \hline
+
+U8
+& Solution detection
+& \texttt{IsSolved()} returns false for a known unsolved state and true for a known solved state. Verify that the exit position is $(5,2)$.
+\\ \hline
+
+U9
+& Null heuristic
+& Returns 0 for every state.
+\\ \hline
+
+U10
+& Distance heuristic range
+& The value lies in $[0, 4]$ and is 0 only for a solved state.
+\\ \hline
+
+U11
+& Distance + blocking heuristic values
+& Verify that the distance + blocking heuristic returns the expected values for known states.
+\\ \hline
+
+U12
+& Least-moves heuristic values
+& Verify that the least-moves heuristic returns the expected values for known states.
+\\ \hline
+
+U13
+& Heuristic admissibility
+& For all four heuristics, $h(s) \leq h^*(s)$, where $h^*(s)$ is the actual minimum number of moves, measured on known puzzles.
+\\ \hline
+
+U14
+& Heuristic monotonicity
+& For all four heuristics, every state $s$ and neighbor $s'$ satisfy $| h(s) - h(s') | \leq 1$.
+\\ \hline
+
+U15
+& Tabu solver termination
+& On a solvable puzzle, with a tabu size greater than the number of states, the algorithm either finds a solution or terminates without one.
+\\ \hline
+
+U16
+& Backtracking completeness
+& On a solvable puzzle, backtracking finds a solution with a suitable heuristic.
+\\ \hline
+
+U17
+& A$^C$ optimality
+& For a puzzle with a known optimal solution length, A$^C$ with a monotone heuristic finds a solution of that optimal length.
+\\ \hline
+
+U18
+& Backtracking termination on an unsolvable level
+& On an unsolvable level, backtracking terminates within $O(b^V \cdot V)$ time and reports that no solution exists.
+\\ \hline
+
+U19
+& A$^C$ termination on an unsolvable level
+& On an unsolvable level, graph search terminates within $O(V)$ time and reports that no solution exists.
+\\ \hline
+
+U20
+& Solver events are raised
+& Subscribe to the A$^C$ solver's \texttt{NewEdge}, \texttt{NewCurrent}, and \texttt{Terminated} events. After running the solver, verify that all three events were raised at least once and that \texttt{Terminated} was raised with the \texttt{Solved} status.
+\\ \hline
+
+U21
+& BFS/DFS discovery counts and limits
+& With a state limit, discovery stops at exactly the specified count. With a sufficiently large limit, it discovers every state.
+\\ \hline
+
+U22
+& StateMove symmetry
+& A \texttt{StateMove} $(A \to B)$ equals its reverse $(B \to A)$ because edges are undirected. Both equality and hash consistency hold in either direction.
+\\ \hline
+
+\caption{Model unit tests}
+\label{tab:ut-discoverers}
+\end{longtable}
+\end{center}
+
+\subsubsection{View: Vertex and Edge Logic}
+
+These tests check the view layer's display logic that is independent of the Godot engine: the effect system, colors, sizes, and physics.
+\begin{center}
+\begin{longtable}{ | P{0.05\textwidth} | P{0.30\textwidth} | P{0.55\textwidth} | }
+\hline
+\multicolumn{3}{|c|}{\textbf{View: Vertex and Edge Logic}}
+\\ \hline
+\textbf{\#} & \textbf{Test case} & \textbf{Verification}
+\\ \hline \hline
+\endfirsthead
+\hline
+\textbf{\#} & \textbf{Test case} & \textbf{Verification}
+\\ \hline \hline
+\endhead
+\hline
+\endfoot
+\endlastfoot
+
+V1
+& Adding, removing, and prioritizing vertex effects
+& \texttt{AddEffect}/\texttt{RemoveEffect} correctly update the set of active effects. The \texttt{Effect} property always returns the active effect with the smallest enum value, corresponding to the highest priority. After all effects are removed, \texttt{Effect} is null.
+\\ \hline
+
+V2
+& Vertex color by effect
+& \texttt{GetColor()} returns the documented color for every \texttt{VertexEffect} value. A vertex created from a solved state automatically receives the solved effect.
+\\ \hline
+
+V3
+& Vertex size by effect
+& \texttt{GetScale()} returns the documented size for every effect value.
+\\ \hline
+
+V4
+& Edge effect system and color
+& On the \texttt{Edge} class, \texttt{AddEffect}/\texttt{RemoveEffect}/\texttt{ClearEffects} correctly manage active effects. \texttt{GetColor()} returns the correct colors.
+\\ \hline
+
+V5
+& Edge spring force direction
+& With two vertices placed $2 \times$ springLength apart, \texttt{ApplySpringForce()} pulls them toward one another; after \texttt{Integrate()}, the force's effect is visible in the expected direction. When placed close together ($0.5 \times$ springLength), the force pushes them apart. This checks the direction and sign of the spring force.
+\\ \hline
+
+V6
+& Vertex physics integration
+& After applying a force to a vertex initially at rest, \texttt{Integrate(delta)} changes its velocity and position in the direction of the force. In a second step without force, linear damping reduces its velocity. Applying a large opposing force reverses the velocity.
+\\ \hline
+
+\caption{Unit tests for view-layer vertex and edge logic}
+\label{tab:ut-view}
+\end{longtable}
+\end{center}
+
+To run the unit tests, execute the following command in the project directory:
+
+\begin{lstlisting}
+dotnet add package gdUnit4.api --version 5.1.0-rc1
+\end{lstlisting}
+
+The unit tests can then be run from the editor.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\textwidth]{unit_tests}
+    \caption{Successful execution of the unit tests in the editor}
+    \label{fig:unit-tests}
+\end{figure}
+
+\subsection{End-User Test Cases}
+
+The following test cases are based on the user stories in Table~\ref{tab:userstory}.
+
+\begin{longtable}{ | P{0.05\textwidth} | P{0.20\textwidth} | P{0.20\textwidth} | P{0.20\textwidth} | P{0.20\textwidth} | }
+\hline
+\multicolumn{5}{|c|}{\textbf{End-User Test Cases}}
+\\ \hline
+\textbf{\#} & \textbf{Action} & \textbf{Precondition} & \textbf{Input} & \textbf{Expected result}
+\\ \hline \hline
+\endfirsthead
+\hline
+\textbf{\#} & \textbf{Action} & \textbf{Precondition} & \textbf{Input} & \textbf{Expected result}
+\\ \hline \hline
+\endhead
+\hline
+\endfoot
+\endlastfoot
+
+E1
+& Load a level
+& The level selection tab is open.
+& \enquote{Level 1} button
+& The board shows level 1; the graph contains one blue vertex.
+\\ \hline
+
+E2
+& Manual move
+& A level is loaded.
+& Click a red arrow.
+& The corresponding car moves in the arrow's direction; a new vertex and edge appear in the graph.
+\\ \hline
+
+E3
+& BFS discovery
+& A level is loaded.
+& Maximum states: 1000; start BFS.
+& The graph is populated with at most 1000 vertices; discovered solutions are green.
+\\ \hline
+
+E4
+& Pause discovery
+& Discovery is running.
+& \textit{Pause} button
+& Discovery pauses; the vertices settle into position.
+\\ \hline
+
+E5
+& Configure the search algorithm
+& A level is loaded.
+& Select an algorithm and a heuristic, then press \textit{Apply solver algorithm}.
+& The algorithm is configured and ready to run.
+\\ \hline
+
+E6
+& Run the algorithm
+& An algorithm is configured.
+& \textit{Start} button
+& The algorithm begins running.
+\\ \hline
+
+E7
+& Adjust algorithm speed
+& An algorithm is configured.
+& \textit{Solver algorithm speed} slider
+& The algorithm executes steps at the selected speed.
+\\ \hline
+
+E8
+& Execute one algorithm step
+& The algorithm has not terminated.
+& \textit{Step} button
+& The algorithm executes one step and remains paused.
+\\ \hline
+
+E9
+& Restart the algorithm
+& A level and search algorithm are loaded.
+& \textit{Restart} button
+& The algorithm resets; algorithm highlights and the step count return to their initial values.
+\\ \hline
+
+E10
+& Switch modes (Manual or Algorithm)
+& An algorithm is configured.
+& Manual or Algorithm button
+& The board switches to the chosen mode, showing either manual moves or the algorithm's steps.
+\\ \hline
+
+E11
+& Find a solution
+& The algorithm is running on a solvable level.
+& Wait for termination.
+& Status is Solved; the solution path is green; the solution length is visible.
+\\ \hline
+
+E12
+& Jump to a discovered state
+& A level is loaded and some vertices have been discovered.
+& Left-click a vertex.
+& The vertex turns red; the board switches to Manual mode and displays that state.
+\\ \hline
+
+E13
+& Rotate the camera
+& The graph is visible.
+& Right mouse button + mouse movement
+& The state graph rotates in the direction of the movement.
+\\ \hline
+
+E14
+& Zoom
+& The graph is visible.
+& Scroll the mouse wheel up/down.
+& The state graph is displayed closer/farther away.
+\\ \hline
+
+E15
+& Move the camera
+& The graph is visible.
+& W/A/S/D keys
+& The camera moves according to the key pressed.
+\\ \hline
+
+E16
+& Hide vertices
+& The graph is visible.
+& \textit{Hide} toggle
+& All white vertices and edges are hidden.
+\\ \hline
+
+\caption{Test cases based on the user stories}
+\label{tab:user-tests}
+\end{longtable}

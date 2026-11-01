@@ -1,0 +1,327 @@
+\chapter{User Documentation}
+\label{ch:user}
+
+This chapter provides a complete description of the application for users. It begins with a summary of the problem, introduces the methods used, and then explains how to run and interact with the program.
+
+\section{Problem Definition}
+
+Rush Hour~\cite{rushhour_puzzle} is a sliding-block puzzle played on a $6 \times 6$ square grid. The board can contain two types of vehicles: \textbf{cars}, occupying $1 \times 2$ cells, and \textbf{buses}, occupying $1 \times 3$ cells. Each vehicle can move only forward and backward along its longer axis, and vehicles cannot push one another. The objective is to slide the designated red \textbf{main car} horizontally until it reaches the exit on the right edge of the board in the third row.
+
+The puzzle is considered \textbf{solved} when the front of the main car is immediately next to the exit. The game's state space consists of all configurations reachable from the initial state. Transitions between states correspond to moving a single vehicle by one cell in a permitted direction.
+
+The application focuses on two related challenges:
+\begin{enumerate}
+    \item Implementing search algorithms for Rush Hour and providing interactive control over them, allowing users to pause, step through, and resume execution at will while analyzing each decision.
+    \item Visualizing the state graph in a three-dimensional scene, where vertices represent discovered states and edges represent permitted moves. A force-directed layout brings structurally related states close together.
+\end{enumerate}
+
+\section{Overview of the Methods}
+
+The application implements three search algorithms, each using a heuristic control strategy with configurable heuristic functions:
+
+\begin{description}
+    \item[Tabu search] A local search method with an irrevocable strategy: it selects the best neighboring state according to a heuristic while remembering recently visited states in a \emph{tabu list} to avoid cycles.
+    \item[Backtracking search] A search method with a revisable strategy: it explores states in a heuristic-guided order, avoids cycles, and backtracks at dead ends. It is guaranteed to terminate on a finite state graph.
+    \item[A\textsuperscript{C} graph search] A graph search method with a revisable strategy, using the evaluation function $f(n) = g(n) + h(n)$, where $g(n)$ is the depth (the number of moves from the initial state) and $h(n)$ is the heuristic value. With admissible and monotone heuristics, this algorithm finds an optimal solution.
+\end{description}
+
+Four heuristic functions are available, all of which are nonnegative, admissible, and monotone:~\cite[pp.~14--15]{gregorics_grafker}
+\begin{compactitem}
+    \item \textbf{Null heuristic} ($h = 0$): provides no guidance and is useful for observing \enquote{brute-force} behavior.
+    \item \textbf{Distance heuristic}: the distance of the main car from the exit (range: 0--4).
+    \item \textbf{Distance + blocking heuristic}: the distance plus a cost of one for each occupied cell between the main car and the exit.
+    \item \textbf{Least-moves heuristic}: provides a stronger lower bound on the moves needed to solve the puzzle: the distance plus the minimum number of moves required to move the vehicles blocking the main car's path out of the way.
+\end{compactitem}
+
+Admissibility means that a heuristic never overestimates the actual minimum cost. Monotonicity means that a single move can change the heuristic value by at most 1. These properties ensure that A$^C$ graph search finds an optimal solution.~\cite[p.~16]{gregorics_grafker}
+
+A force-directed approach is used to arrange the 3D state graph: edges act as springs that pull neighboring states toward a given separation, while every pair of vertices exerts a repulsive force inversely proportional to the square of their distance. The computationally expensive $O(V^2)$ repulsion calculation is approximated using the Barnes--Hut algorithm~\cite{barneshut1986}, implemented with an octree spatial data structure, reducing its time complexity to $O(V \log V)$.
+
+\section{System Requirements}
+
+The application is available as an executable for Windows and Linux and requires no additional software installation.
+The project can also be run from the Godot editor and exported as an executable for other platforms.
+The recommended minimum screen resolution is $1280 \times 720$.
+The executables are available in the thesis project's \href{https://github.com/SzabiSuli/rushhour/}{\underbar{GitHub repository}}.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{ | m{0.25\textwidth} | m{0.65\textwidth} | }
+        \hline
+        \textbf{Platform} & \textbf{How to run} \\
+        \hline \hline
+        \emph{Windows} & Download and extract \texttt{windows\_build.zip}, then run \texttt{rushhour.exe} from the extracted files. \\
+        \hline
+        \emph{Linux} & Download and extract \texttt{linux\_build.zip}, then run \texttt{rushhour.x86\_64} from the extracted files. \\
+        \hline
+        \emph{macOS / other} & Clone or download the repository, import the extracted \texttt{rushhour/project.godot} file into the Godot 4.6 Mono editor using Import Project, and run it using the button in the upper-right corner. \\
+        \hline
+    \end{tabular}
+    \caption{Supported platforms and instructions for running the application}
+    \label{tab:platforms}
+\end{table}
+
+Prerequisites for opening the project in the editor:
+\begin{compactitem}
+    \item Download the Godot 4.6 Mono (C\#) editor.~\cite{godot_engine}
+    \item Install .NET SDK 9.0 or later.~\cite{dotnet9}
+\end{compactitem}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[t]{0.35\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{import_project}
+        \caption{Importing the project}
+    \end{subfigure}\hfill
+    \begin{subfigure}[t]{0.4\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{open_project}
+        \caption{Opening the project}
+    \end{subfigure}\hfill
+    \begin{subfigure}[t]{0.2\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{run_project}
+        \caption{Running the project}
+    \end{subfigure}
+    \caption{Opening and running the project from the Godot editor}
+    \label{fig:open-run-project}
+\end{figure}
+
+To build from source once the prerequisites have been met, open the project and select Project > Export in the upper-left corner. Add an export configuration for the chosen platform, then download the export templates when prompted by the editor.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{export_project}
+        \caption{Opening the export dialog}
+    \end{subfigure}\hfill
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{add_export_option}
+        \caption{Adding an export configuration}
+    \end{subfigure}\hfill
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{manage_export_templates}
+        \caption{Managing export templates}
+    \end{subfigure}
+
+    \vspace{0.5em}
+
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{go_online}
+        \caption{Going online}
+    \end{subfigure}\hfill
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{download_export_templates}
+        \caption{Downloading export templates}
+    \end{subfigure}\hfill
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{export_project_last_step}
+        \caption{Exporting the project}
+    \end{subfigure}
+    \caption{Steps for exporting the project from the Godot editor}
+    \label{fig:export-project}
+\end{figure}
+
+\section{Application Overview}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.70\textwidth]{app_preview}
+    \caption{The application while an algorithm is running}
+    \label{fig:app-preview}
+\end{figure}
+
+The application window is divided into two main areas:
+\begin{compactitem}
+    \item \textbf{Left panel}: the scene displaying the 3D state graph.
+    \item \textbf{Right panel}: configuration and control options, divided into three tabs.
+\end{compactitem}
+
+The left panel contains:
+\begin{compactitem}
+    \item In the lower-left corner, the controls for interacting with the state graph and the color legend.
+    \item In the upper-right corner, information about the currently running algorithm:
+    \begin{compactitem}
+        \item The number of steps performed by the algorithm.
+        \item The algorithm's current status.
+        \item The number of moves in the solution found.
+        \item The heuristic value of the state currently displayed on the board.
+    \end{compactitem}
+\end{compactitem}
+
+The right panel is divided into the following tabs:
+\begin{compactitem}
+    \item \textbf{Level selection tab}: select a puzzle by clicking one of the listed previews.
+    \item \textbf{Solver settings tab}: start state discovery and choose the search algorithm and heuristic to apply to the selected puzzle.
+    \item \textbf{Game board tab}: contains the game board, buttons for selecting Manual or Algorithm mode, algorithm controls for pausing, resuming, stepping, and restarting, a slider for the algorithm's execution speed, and switches controlling the state graph's appearance.
+\end{compactitem}
+
+\section{Loading a Level}
+
+The application contains a curated collection of Rush Hour puzzles of varying difficulty. Scroll through the list to view all puzzles.
+
+A different puzzle can be selected at any time:
+\begin{enumerate}
+    \item Open the \textbf{Levels} tab in the upper-right corner.
+    \item Click the button corresponding to the desired puzzle.
+    \item The game board loads the initial configuration, and a blue vertex representing the initial state appears in the 3D state graph.
+\end{enumerate}
+
+\section{Manual Play}
+
+The puzzle can be played manually by interacting directly with the game board:
+\begin{enumerate}
+    \item Red arrow indicators appear next to each movable vehicle, showing the available movement directions.
+    \item Click an arrow to move the corresponding vehicle by one cell.
+    \item Each manual move creates a new state and its corresponding vertex and edge in the 3D graph, if the state has not already been discovered. This allows users to build the state graph interactively.
+\end{enumerate}
+
+You can switch to manual mode at any time by pressing the \textbf{Manual} button or clicking the vertex of an already discovered state. In both cases, the board displays the selected state and switches to manual mode. If a search algorithm is currently running, it continues in the background. The vertex of the manually selected state is shown in red in the state graph.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{manual_moves}
+        \caption{Solving the puzzle with manual moves, without a search algorithm}
+    \end{subfigure}\hfill
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{manual_button}
+        \caption{The board stops following the algorithm's steps after switching to manual mode.}
+    \end{subfigure}\hfill
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{clicked_state}
+        \caption{Selecting a state by clicking a discovered vertex}
+    \end{subfigure}
+    \caption{Manual play and vertex selection}
+    \label{fig:manual-play}
+\end{figure}
+
+\section{Configuring the Search Algorithm}
+
+Before running a search algorithm, users can configure its parameters on the \textbf{Solver settings} tab:
+
+\begin{description}
+    \item[Algorithm selection] Choose tabu search, backtracking search, or A\textsuperscript{C} graph search.
+    \item[Tabu size] (Tabu search only.) An integer $n \geq 0$ specifying how many recently visited states the system remembers.
+    \begin{compactitem}
+        \item $n = 0$: greedy algorithm---always moves to the best neighbor without retaining any memory.
+        \item $n = 1$: hill-climbing algorithm---remembers only the previous state and avoids returning to it.
+        \item $n > 1$: avoids the last $n$ visited states. If every possible move leads to a tabu state, the algorithm terminates without a solution.
+    \end{compactitem}
+    \item[Heuristic function] Choose one of the four available heuristics: Null, Distance, Distance + Blocking, or Least-Moves Estimate.
+    \item[Randomization switch] When enabled, the algorithm chooses randomly among states with equal heuristic scores instead of selecting deterministically. This can produce different traversal paths on repeated runs.
+    \item[Apply button] Press this button to initialize the search algorithm for the loaded puzzle with the selected settings.
+\end{description}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\textwidth]{solver_settings}
+    \caption{Configuring and applying search algorithms}
+    \label{fig:solver-settings}
+\end{figure}
+
+\section{Running Search Algorithms}
+
+After loading a level and configuring and applying the solver with the Apply button, the algorithm can be controlled from the \textbf{Game board} tab:
+
+\begin{description}
+    \item[Play/Pause] Start or pause continuous execution of the algorithm.
+    \item[Step] Execute a single step of the algorithm, which is useful for detailed observation.
+    \item[Restart] Reset the algorithm to the initial state while retaining the current settings.
+    \item[Speed slider] Set the delay between algorithm steps. Moving the slider to the right increases the speed. At its maximum setting, the algorithm runs as fast as possible and may execute hundreds of steps per frame.
+\end{description}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\textwidth]{algorithm_controls}
+    \caption{Controlling algorithm execution}
+    \label{fig:algorithm-controls}
+\end{figure}
+
+When the algorithm finds a solution, the solution path is highlighted in green in the state graph, and the solution length is displayed.
+
+\section{Discovering States}
+
+In addition to the search algorithms, the application offers \textbf{BFS} (breadth-first search) and \textbf{DFS} (depth-first search) discovery modes, available from the Solver settings tab. These modes explore the state space without searching for a solution, adding every reachable state and edge to the state graph:
+
+\begin{compactitem}
+    \item A \textbf{maximum state count} can be set to limit the number of discovered states. This is recommended for more difficult puzzles, whose state spaces may contain thousands of elements: too many vertices can make the state graph difficult to interpret and slow down the physical simulation.
+    \item The \textbf{unlimited} switch removes the state limit.
+\end{compactitem}
+
+Discovery runs at high speed and populates the graph. Users can then run a search algorithm on the fully or partially explored state space. Discovery can also be controlled using the Play/Pause and Step buttons and the speed slider.
+
+\section{Interacting with the 3D State Graph}
+
+The application displays the state graph in the 3D area on the left. The following interactions are available:
+
+\begin{description}
+    \item[Rotate the camera] Hold down the right mouse button and drag the mouse to orbit around the graph.
+    \item[Move the camera] Use the \texttt{W}, \texttt{A}, \texttt{S}, and \texttt{D} keys to move the camera relative to its current orientation. Hold \texttt{Shift} to move faster.
+    \item[Zoom] Use the mouse wheel to zoom in and out.
+    \item[Click a vertex] Left-click a vertex to jump to that state: the game board switches to Manual mode and displays the selected state.
+    \item[Hide vertices/edges] A toggle on the Game board tab hides all vertices and edges that are not highlighted. This can reduce visual clutter when exploring large graphs.
+\end{description}
+
+\section{Color Legend}
+\label{sec:color-legend}
+
+The vertices and edges of the 3D graph are color-coded to indicate their roles:
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{ | m{0.20\textwidth} | m{0.15\textwidth} | m{0.55\textwidth} | }
+        \hline
+        \textbf{Element} & \textbf{Color} & \textbf{Meaning} \\
+        \hline \hline
+        \emph{Vertex} & Red & Current manually selected state \\
+        \hline
+        \emph{Vertex} & Green & Solved state (main car at the exit) \\
+        \hline
+        \emph{Vertex} & Blue & Initial state of the current puzzle \\
+        \hline
+        \emph{Vertex} & Orange & Algorithm's current state \\
+        \hline
+        \emph{Vertex} & Yellow & State stored in the algorithm's memory \\
+        \hline
+        \emph{Vertex} & White & Discovered state \\
+        \hline
+        \emph{Edge} & Green & Part of the solution path found \\
+        \hline
+        \emph{Edge} & Yellow & Move stored in the algorithm's memory \\
+        \hline
+        \emph{Edge} & White & Discovered move \\
+        \hline
+    \end{tabular}
+    \caption{Color legend for the vertices and edges of the 3D state graph}
+    \label{tab:color-legend}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{yellow_states}
+        \caption{The spanning tree stored in the graph search algorithm's memory is shown in yellow; the current state is orange.}
+    \end{subfigure}\hfill
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{green_states}
+        \caption{A solved state and the edges of its solution path are highlighted in green. A selected state on the solution path is shown in red.}
+    \end{subfigure}
+    \caption{Illustration of the state graph's color coding}
+    \label{fig:color-states}
+\end{figure}
+
+A state's vertex can have several properties at once: for example, it may be both selected and stored in the algorithm's memory. In such cases, the first applicable property in the table takes priority when determining its appearance.
+The first four properties (manual current state, solved state, initial state, and algorithm current state) are indicated by larger vertices as well as distinct colors. Vertices stored in the algorithm's memory are also slightly larger.
